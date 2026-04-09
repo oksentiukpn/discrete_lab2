@@ -63,9 +63,13 @@ class Client:
                 msg = rsa_decrypt(encrypted_msg, self.d, self.n)
 
                 if simple_hash(msg) == received_hash:
-                    print(f"\n{msg}")
+                    print(f"\r\033[K{msg}")
+                    print(f"{self.username}> ", end="", flush=True)
                 else:
-                    print("\n[Warning]: Received a message with corrupted integrity!")
+                    print(
+                        "\r\033[K[Warning]: Received a message with corrupted integrity!"
+                    )
+                    print(f"{self.username}> ", end="", flush=True)
             except Exception:
                 break
 

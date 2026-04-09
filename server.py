@@ -54,12 +54,17 @@ class Server:
 
             threading.Thread(target=self.handle_client, args=(c, addr)).start()
 
-    def broadcast(self, msg: str):
+    def broadcast(self, msg: str, sender_socket: socket.socket):
         msg_hash = simple_hash(msg)
         for client in self.clients:
-            ce, cn = self.client_keys[client]
-            encrypted_msg = rsa_encrypt(msg, ce, cn)
-            client.send(str((msg_hash, encrypted_msg)).encode())
+            if client == sender_socket:
+                continue
+            try:
+                ce, cn = self.client_keys[client]
+                encrypted_msg = rsa_encrypt(msg, ce, cn)
+                client.send(str((msg_hash, encrypted_msg)).encode())
+            except Exception as e:
+                print(f"Failed to send to a client: {e}")
 
     def handle_client(self, c: socket, addr):
         while True:
@@ -72,7 +77,8 @@ class Server:
                 msg = rsa_decrypt(encrypted_msg, self.d, self.n)
 
                 if simple_hash(msg) == received_hash:
-                    self.broadcast(msg)
+                    print(f"Broadcasting: {msg}")
+                    self.broadcast(msg, c)
                 else:
                     print(
                         f"Integrity check failed for message from {self.username_lookup.get(c, 'Unknown')}"
@@ -80,6 +86,10 @@ class Server:
             except Exception as e:
                 print(f"Error handling client {addr}: {e}")
                 break
+
+        if c in self.clients:
+            self.clients.remove(c)
+        c.close()
 
 
 if __name__ == "__main__":
