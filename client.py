@@ -12,6 +12,13 @@ def rsa_decrypt(codes, d, n):
     return "".join([chr(pow(code, d, n)) for code in codes])
 
 
+def simple_hash(text):
+    h = 5381
+    for char in text:
+        h = ((h << 5) + h) + ord(char)
+    return h & 0xFFFFFFFFFFFFFFFF
+
+
 class Client:
     def __init__(self, server_ip: str, port: int, username: str) -> None:
         self.server_ip = server_ip
@@ -51,8 +58,14 @@ class Client:
                 data = self.s.recv(4096).decode()
                 if not data:
                     break
-                codes = eval(data)
-                print(f"\n{rsa_decrypt(codes, self.d, self.n)}")
+
+                received_hash, encrypted_msg = eval(data)
+                msg = rsa_decrypt(encrypted_msg, self.d, self.n)
+
+                if simple_hash(msg) == received_hash:
+                    print(f"\n{msg}")
+                else:
+                    print("\n[Warning]: Received a message with corrupted integrity!")
             except Exception:
                 break
 
@@ -60,9 +73,10 @@ class Client:
         while True:
             msg = input(f"{self.username}> ")
             full_msg = f"{self.username}: {msg}"
-            encrypted = rsa_encrypt(full_msg, self.se, self.sn)
-            self.s.send(str(encrypted).encode())
 
+            msg_hash = simple_hash(full_msg)
+            encrypted = rsa_encrypt(full_msg, self.se, self.sn)
+            self.s.send(str((msg_hash, encrypted)).encode())
 
 
 if __name__ == "__main__":
