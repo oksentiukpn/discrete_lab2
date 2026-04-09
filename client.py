@@ -1,11 +1,27 @@
 import socket
 import threading
 
+from random_prime import get_random_prime
+
+
+def rsa_encrypt(text, e, n):
+    return [pow(ord(char), e, n) for char in text]
+
+
+def rsa_decrypt(codes, d, n):
+    return "".join([chr(pow(code, d, n)) for code in codes])
+
+
 class Client:
     def __init__(self, server_ip: str, port: int, username: str) -> None:
         self.server_ip = server_ip
         self.port = port
         self.username = username
+
+        p, q = get_random_prime(256), get_random_prime(256)
+        self.n = p * q
+        self.e = 65537
+        self.d = pow(self.e, -1, (p - 1) * (q - 1))
 
     def init_connection(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -17,37 +33,37 @@ class Client:
 
         self.s.send(self.username.encode())
 
-        # create key pairs
+        server_pub = self.s.recv(1024).decode()
+        self.se, self.sn = map(int, server_pub.split(","))
 
-        # exchange public keys
+        self.s.send(f"{self.e},{self.n}".encode())
 
-        # receive the encrypted secret key
+        print("Connected and keys exchanged!")
 
-        message_handler = threading.Thread(target=self.read_handler,args=())
+        message_handler = threading.Thread(target=self.read_handler, args=())
         message_handler.start()
-        input_handler = threading.Thread(target=self.write_handler,args=())
+        input_handler = threading.Thread(target=self.write_handler, args=())
         input_handler.start()
 
-    def read_handler(self): 
+    def read_handler(self):
         while True:
-            message = self.s.recv(1024).decode()
-
-            # decrypt message with the secrete key
-
-            # ... 
-
-
-            print(message)
+            try:
+                data = self.s.recv(4096).decode()
+                if not data:
+                    break
+                codes = eval(data)
+                print(f"\n{rsa_decrypt(codes, self.d, self.n)}")
+            except Exception:
+                break
 
     def write_handler(self):
         while True:
-            message = input()
+            msg = input(f"{self.username}> ")
+            full_msg = f"{self.username}: {msg}"
+            encrypted = rsa_encrypt(full_msg, self.se, self.sn)
+            self.s.send(str(encrypted).encode())
 
-            # encrypt message with the secrete key
 
-            # ...
-
-            self.s.send(message.encode())
 
 if __name__ == "__main__":
     cl = Client("127.0.0.1", 9001, "b_g")
